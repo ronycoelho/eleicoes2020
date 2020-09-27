@@ -1,0 +1,220 @@
+---
+title: "Cand_pref"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# bibliotecas
+```{r}
+library(tidyverse)
+library(stringi)
+library(ribge)
+library(scales)
+```
+
+# config
+```{r}
+bar.color <- "#1280A1"
+back <- "#EEEEEE"
+strip <- "#D5E1E5"
+
+color.range <- colorRampPalette(c(bar.color, back))(10)[9]
+#scales::show_col(color.range)
+
+theme_set(theme_minimal()+
+            theme(
+              plot.title=element_text(face="bold"),
+              plot.background=element_rect(fill = back, color = back),
+              panel.background=element_rect(fill = back, color =back),
+              panel.grid=element_line(color = "white"),
+              plot.margin=unit(c(1,1,1,1), "cm"),
+              strip.background=element_rect(fill = strip, color = "white")
+                  ))
+```
+
+
+# Download
+```{r}
+#######################################
+link <- "http://agencia.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2020.zip"
+
+download.zip <- function(link){
+  temp_dir <- tempdir()
+  temp_file <- tempfile(tmpdir=temp_dir)
+  download.file(url=link, destfile=temp_file)
+  unzip(temp_file, exdir=temp_dir)
+  files <- list.files(path=temp_dir)
+  unlink(temp_file)
+  return(files) 
+}
+
+list.of.files <- download.zip(link)
+
+#######################################
+codigos <- read_csv("http://basedosdados.org/dataset/b5878df7-e259-44bc-8903-4feb8d56945a/resource/c1deb363-ffba-4b1e-95dc-c5e08311852e/download/diretorio_municipios.csv")
+```
+
+# Carregar
+```{r}
+file <- paste0(tempdir(), "\\consulta_cand_2020_BRASIL.csv")
+
+# guess_encoding(cand_sp)
+brasil <- read_csv2(file)
+```
+
+# Manipular 1 
+```{r}
+brasil <- brasil %>%
+  janitor::clean_names()
+
+brasil$nm_candidato <- descr::toUTF8(brasil$nm_candidato)
+
+codigos <- codigos %>%
+  select(sg_ue = id_municipio_TSE, regiao) %>% 
+  mutate(sg_ue = as.character(sg_ue),
+         sg_ue = str_pad(sg_ue, width=5, pad=0)) 
+
+
+brasil <- brasil %>% 
+  left_join(codigost) %>% 
+  relocate(regiao, .after = sg_uf)
+```
+
+# Prefeitos - Brasil
+```{r}
+brasil %>% 
+  filter(ds_cargo == "PREFEITO") %>% 
+  count(sg_partido, sort = T) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, n)) %>% 
+  ggplot(aes(n, sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(label = scales::comma_format(big.mark="."))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust =  -0.1)+
+  labs(title = "Eleições 2020 - Brasil",
+       subtitle= "Candidaturas as Prefeituras por partidos",
+       x = "", y = "Partidos", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+```
+
+# Norte
+```{r}
+norte <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+        regiao == "Norte") %>% 
+  count(sg_uf, sg_partido, sort = T) %>%  
+  add_count(sg_partido, wt = n) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, nn)) %>% 
+  ggplot(aes(n, sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(limits=c(0, 135))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust = -0.1)+
+  facet_grid(~ sg_uf)+
+  theme(axis.text.x=element_blank())+
+  labs(title = "Eleições 2020 - Norte",
+       subtitle= "Candidaturas às Prefeituras por partidos",
+       x = "", y = "", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+```
+
+# Nordeste
+```{r}
+nordeste <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+        regiao == "Nordeste") %>% 
+  count(sg_uf, sg_partido, sort = T) %>%  
+  add_count(sg_partido, wt = n) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, nn)) %>% 
+  mutate(max = max(n)+20) %>% 
+  ggplot(aes(n,sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(limits=c(0,290 ))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust = -0.1)+
+  facet_grid(~ sg_uf)+
+  theme(axis.text.x=element_blank())+
+  labs(title = "Eleições 2020 - Nordeste",
+       subtitle= "Candidaturas às Prefeituras por partidos",
+       x = "", y = "", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+
+nordeste
+```
+
+# Centro Oeste
+```{r}
+regiao <- "Centro-Oeste"
+
+centro <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+        regiao == "Centro-Oeste") %>%  
+  count(sg_uf, sg_partido, sort = T) %>%
+  add_count(sg_partido, wt = n) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, nn)) %>% 
+  mutate(max = max(n)+20) %>% 
+  ggplot(aes(n, sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(limits=c(0,154))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust = -0.1)+
+  facet_grid(~ sg_uf)+
+  theme(axis.text.x=element_blank())+
+  labs(title = paste("Eleições 2020 -", regiao),
+       subtitle= "Candidaturas às Prefeituras por partidos",
+       x = "", y = "", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+
+centro
+```
+
+# Sudeste
+```{r}
+regiao <- "Sudeste"
+
+sudeste <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+        regiao == "Sudeste") %>%  
+  count(sg_uf, sg_partido, sort = T) %>%
+  add_count(sg_partido, wt = n) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, nn)) %>% 
+  mutate(max = max(n)+20) %>% 
+  ggplot(aes(n, sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(limits=c(0,410))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust = -0.1)+
+  facet_grid(~ sg_uf)+
+  theme(axis.text.x=element_blank())+
+  labs(title = paste("Eleições 2020 -", regiao),
+       subtitle= "Candidaturas às Prefeituras por partidos",
+       x = "", y = "", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+
+sudeste
+```
+
+# Sul
+```{r}
+regiao <- "Sul"
+
+sul <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+        regiao == "Sul") %>%  
+  count(sg_uf, sg_partido, sort = T) %>%
+  add_count(sg_partido, wt = n) %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, nn)) %>% 
+  mutate(max = max(n)+20) %>% 
+  ggplot(aes(n, sg_partido))+
+  geom_col(fill = bar.color)+
+  scale_x_continuous(limits=c(0,293))+
+  geom_text(aes(x = n, y = sg_partido, label = n),
+            hjust = -0.1)+
+  facet_grid(~ sg_uf)+
+  theme(axis.text.x=element_blank())+
+  labs(title = paste("Eleições 2020 -", regiao),
+       subtitle= "Candidaturas às Prefeituras por partidos",
+       x = "", y = "", caption="fonte: http://divulgacandcontas.tse.jus.br/divulga/ \ngráfico: @_ronycoelho")
+
+sul
+```

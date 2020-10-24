@@ -1,0 +1,162 @@
+---
+title: "Eleições 2020 - cand_pref_pt"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(stringi)
+#library(ribge)
+library(scales)
+library(ggthemes)
+library(sf)
+library(patchwork)
+```
+
+```{r}
+#dados de 2020
+load("dadoseleitorais_soudapaz_14_de_out.RData")
+
+#dados de 2016 e 2012
+load("Dados_2012_2016.RData")
+```
+
+
+```{r}
+brasil <- brasil %>%
+  janitor::clean_names()
+
+dt.2012.2016 <- dt.2012.2016 %>%
+  janitor::clean_names()
+```
+
+
+```{r}
+pref.2020 <- brasil %>% 
+  filter(ds_cargo == "PREFEITO",
+         sg_partido == "PT") %>% 
+  count(ano_eleicao, sg_ue)
+
+prefs.pt <- dt.2012.2016 %>%
+  filter(descricao_cargo == "PREFEITO",
+         sigla_partido == "PT") %>% 
+  count(ano_eleicao, sg_ue = sigla_ue) %>% 
+  bind_rows(pref.2020) %>% 
+  mutate(partido = "PT")
+```
+
+```{r}
+prefs.pt <- codigos %>%
+  select(sg_ue = id_municipio_TSE, id_municipio, regiao) %>%
+  mutate(sg_ue = as.character(sg_ue),
+         sg_ue = str_pad(sg_ue, width=5, pad=0)) %>% 
+  right_join(prefs.pt) 
+  
+shapemun2 <- shapemun %>% 
+  cbind(.,sf::st_coordinates(sf::st_centroid(.$geom)))
+
+prefs.pt.map <- shapemun2 %>%
+  select(id_municipio = code_muni, everything()) %>% 
+  full_join(prefs.pt)
+
+
+
+
+```
+
+```{r}
+map <- prefs.pt.map %>%
+    filter(!is.na(ano_eleicao)) %>% 
+    ggplot()+
+    geom_sf(aes(fill=partido), colour = alpha("#efefef", .1), lty=3, 
+            show.legend = F)+
+    scale_fill_discrete(na.value = "#efefef")+
+    geom_sf(data=shapeestado, fill=NA, color = "black")+
+    theme_map()+
+    theme(panel.background = element_rect(fill = "#efefef", color = "transparent"),
+          plot.background = element_rect(fill = "#efefef", color = "transparent"),
+          strip.background = element_rect(fill = "transparent", 
+                                          color = "transparent"),
+          strip.text = element_text(hjust = 0, face = "bold", size = 12))+
+  facet_grid(~ ano_eleicao)
+```
+
+```{r}
+p1 <- prefs.pt %>% 
+  count(ano_eleicao) %>% 
+  ggplot() +
+  geom_line(aes(x = ano_eleicao, y = n))+
+  geom_point(aes(x = ano_eleicao, y = n, size = n), show.legend = F)+
+  scale_y_continuous(limits = c(500, 2000), breaks = seq(500, 2000, 500))+
+  scale_x_continuous(limits = c(2012, 2021), breaks = c(2012, 2016, 2020))+
+  scale_size_continuous(range = c(3,3.5))+
+  geom_text(aes(x = ano_eleicao, y = n, label = n), vjust = -.5, hjust = 0)+
+  theme_minimal()+
+  coord_cartesian(clip = "off")+
+  theme(panel.background = element_rect(fill = "#efefef", color = "transparent"),
+          plot.background = element_rect(fill = "#efefef", color = "transparent"))+
+  labs(title = "Qt por ano", x = "", y = "")
+```
+
+
+```{r}
+p2 <- prefs.pt %>% 
+  count(regiao, ano_eleicao) %>% 
+  ggplot(aes(x = regiao, y = n, fill = as.factor(ano_eleicao))) +
+  geom_col(position = "dodge", width = 0.7)+
+  scale_fill_discrete("Ano")+
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "#efefef", color = "transparent"),
+        plot.background = element_rect(fill = "#efefef", color = "transparent"),
+        legend.position = c(.15,.7),
+        legend.key.size = unit(c(.2,.2), "cm"))+
+  labs(title = "Qt por região", x = "", y = "")
+```
+
+
+```{r}
+plot <- map / (p1 + p2) +
+  plot_layout(heights = c(3,1)) +
+  plot_annotation(title = "Candidaturas às prefeituras pelo PT",
+                  subtitle = "Em 2012, 2016 e 2020",
+                  theme = theme (panel.background = element_rect(fill = "#efefef", color = "transparent"),
+          plot.background = element_rect(fill = "#efefef", color = "transparent")))
+```
+
+
+```{r}
+library(Cairo)
+getwd()
+#svg("teste_map_2.svg", width = 7, height = 6)
+Cairo::CairoSVG("teste.with.cairo_3.svg", width = 8, height = 5)
+print(plot)
+dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

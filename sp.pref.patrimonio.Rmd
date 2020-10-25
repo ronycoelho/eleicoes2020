@@ -1,0 +1,160 @@
+---
+title: "sp_patrimonio dos prefeitos"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(stringi)
+#library(ribge)
+library(scales)
+library(ggthemes)
+library(sf)
+library(patchwork)
+```
+
+```{r}
+setwd("C:/rstats/soudapaz")
+#dados de 2020
+load("dadoseleitorais_soudapaz_14_de_out.RData")
+```
+
+```{r}
+theme_set(ggthemes::theme_wsj(color = "gray", base_size = 9))
+
+# scale_color <- ggsci::pal_lancet()(1)
+# 
+# show_col(scale_color)
+# 
+# vir <- viridis_pal(option = "", end = .8)(14)
+
+vir <- colorRampPalette(c("#03045E", "#48CAE4"))(14)
+
+vir <- vir[c(14:1)]
+
+show_col(vir)
+
+```
+
+```{r}
+download.zip <- function(link){
+  wd <- getwd()
+  temp_dir <- tempdir()
+  setwd(temp_dir)
+  temp_file <- tempfile(tmpdir=temp_dir)
+  download.file(url=link, destfile=temp_file)
+  unzip(temp_file, exdir=temp_dir)
+  files <- list.files(path=temp_dir)
+  unlink(temp_file)
+  
+  return(files) 
+  setwd(wd)
+}
+```
+
+
+```{r}
+link_bens <- "http://agencia.tse.jus.br/estatistica/sead/odsele/bem_candidato/bem_candidato_2020.zip"
+
+list.of.files_bens <- download.zip(link_bens)
+
+file_bens <- paste0(tempdir(), "\\bem_candidato_2020_BRASIL.csv")
+
+bens <- read_csv2(file_bens, locale(encoding = "ISO-8859-1"), col_names = T, col_types = NULL)
+```
+
+```{r}
+bens <- bens %>% 
+  janitor::clean_names ()
+```
+
+```{r}
+bens.sp <- bens %>%
+  filter(sg_ue == 71072)
+
+bens.sp <- bens.sp %>% 
+  mutate(id = paste0(sg_ue, "_", sq_candidato))
+
+bens.sp <- bens.sp %>% 
+  group_by(id) %>% 
+  summarise(bens = sum(vr_bem_candidato)) %>% 
+  arrange(desc(bens)) %>% 
+  mutate(valores = scales::dollar(bens, big.mark = ".", prefix = "R$ "))
+```
+
+```{r}
+brasil <- brasil %>% 
+  janitor::clean_names()
+
+info_cart <- names(brasil)[c(1:10, 14, 23, 25, 31, 34, 37, 42, 44, 46, 48, 50, 53, 61)]
+
+brasil <- brasil %>% 
+  select(-one_of(info_cart))
+
+cand.sp <- brasil %>%
+  filter(sg_ue == 71072,
+         ds_cargo == "PREFEITO") %>%  
+  mutate(id = paste0(sg_ue, "_", sq_candidato)) 
+
+cand.sp <- cand.sp %>% 
+  left_join(bens.sp, by = "id")
+```
+
+```{r}
+cand.sp$nm_urna_candidato <- descr::toUTF8(cand.sp$nm_urna_candidato) 
+
+```
+
+
+```{r}
+cand.sp %>%
+  mutate(cand.part = paste0(nm_urna_candidato, " (", sg_partido, ")"),
+         cand.part = fct_reorder(cand.part, bens)) %>% 
+  ggplot(aes(y = cand.part, x = bens)) + 
+  geom_segment(aes(xend = 0, yend = cand.part, 
+                   size = bens, color = cand.part),
+                 show.legend = F) +
+  geom_point(aes(size = bens, color = cand.part),
+               show.legend = F) +
+  geom_label(aes(color = cand.part, label = scales::dollar(bens, big.mark = ".", prefix = "R$ ")), 
+               fill = "white",
+               hjust = "inward",
+               show.legend = F)+
+  scale_color_manual(values = vir)+
+  scale_x_continuous(labels = scales::comma_format(big.mark = "."))+
+  labs(title = "Valor dos bens declarados",
+       subtitle = "Candidatos a prefeitos em São Paulo",
+       x = "", y = "", caption = "Fonte: TSE \nGráfico: @_ronycoelho")+
+  theme(aspect.ratio = 1.05/1,
+        panel.background = element_rect(fill = "#efefef", color = "transparent"),
+          plot.background = element_rect(fill = "#efefef", color = "transparent"))
+
+
+#   ggplot(aes(y = bens)) +
+#   geom_boxplot()+
+#   scale_y_continuous(labels = scales::dollar_format())
+```
+
+```{r}
+geom_segment(aes(xend = 0, yend = ds_ocupacao, size = prop),
+                 show.legend = F, color = scale_color[1:5]) +
+  geom_point(aes(size = prop), color = scale_color[1:5],
+               show.legend = F) +
+  geom_label(aes(label = paste0(" ", prop, "%")), 
+               fill = "white",
+                color = scale_color[1:5],
+               hjust = "inward",
+               show.legend = F)+
+  scale_x_continuous(labels = scales::comma_format(big.mark = "."))+
+  labs(title = "Por ocupação militar declarada",
+       subtitle = "Identificação pelo campo 'Ocupação' na base do TSE",
+       x = "", y = "")
+```
+

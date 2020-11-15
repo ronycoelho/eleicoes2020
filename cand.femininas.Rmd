@@ -1,0 +1,221 @@
+---
+title: "cand.femininas"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(stringi)
+#library(ribge)
+library(scales)
+library(ggthemes)
+library(sf)
+library(patchwork)
+
+setwd("C:/rstats/eleicoes2020/")
+```
+
+```{r}
+save.image("C:/rstats/eleicoes2020/all_elections_")
+load("C:/rstats/eleicoes2020/all_elections_.RData")
+```
+
+```{r}
+all_elections %>%
+  filter(str_detect(nm_urna_candidato, "BOLSONARO")) %>% 
+  count(ano_eleicao) %>% #nm_urna_candidato 
+  ggplot(aes(x = as.factor(ano_eleicao), y = n))+
+  geom_col()+
+  geom_text(aes(y = n, label = n ), vjust = -1)+
+  coord_cartesian(clip = "off")+
+  theme_minimal()+
+  labs(title = '"Bolsonaros" nas eleições municipais', 
+       subtitle ="Número de vezes que aparecem o sobrenome Bolsonaro nos nomes de urna",
+       x = "", y = "")
+```
+
+# Candidaturas femininas
+```{r}
+p.5 <- all_elections %>%
+  count(ano_eleicao, ds_genero) %>% 
+  filter(str_detect(ds_genero, "NÃO", negate = T)) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc = round(n/sum(n)*100, 1)) %>% 
+  ungroup () %>%
+  mutate(label.1 = paste0(perc, "%"),
+         label.2 = number(n, big.mark = ".")) %>% 
+  filter(ds_genero == "FEMININO") %>%  
+  ggplot(aes(as.factor(ano_eleicao), n))+
+  geom_col(width = .5, fill = scale_color[7])+
+  geom_point()+
+  geom_line(group = 1) +
+  scale_y_continuous(labels = scales::number_format())+
+  geom_text(aes(label = label.2), vjust = -1)+
+  geom_text(aes(label = label.1), vjust = -2.5,
+            color = "red")+
+  theme_minimal()+
+  coord_cartesian(clip = "off")+
+  labs(title = "Candidaturas femininas", 
+       subtitle = "Porcentagem das cand. totais em 2012, 2016 e 2020", x ="", y = "")
+```
+
+# Prefeitas eleitas
+```{r}
+p.4 <- all_elections %>%
+  filter(ano_eleicao == 2012 | ano_eleicao == 2016) %>% 
+  filter(ds_cargo == "PREFEITO", ds_genero == "FEMININO") %>% 
+  count(ano_eleicao, ds_cargo, ds_genero, situacao = ds_situacao_candidato_pleito) %>% 
+  mutate(situacao.2 = ifelse(situacao == "ELEITO", "Eleitas", "Não eleitas"),
+         ano_eleicao = as.factor(ano_eleicao)) %>%
+  count(ano_eleicao, situacao.2, wt = n) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc = paste0(round(prop.table(n), 2), "%"),
+         total = number(sum(n), big.mark = ".")) %>% 
+  ggplot(aes(x = ano_eleicao,  y= n, fill = situacao.2)) +
+  geom_col()+
+  scale_y_continuous(labels = scales::number_format())+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc),
+            position = position_stack(vjust = 0.5),
+            col="white", size = 4)+
+  annotate(geom = "text", x = 1, y = 2400, label = "Total de cand.: 2.166")+
+  annotate(geom = "text", x = 2, y = 2500, label = "Total de cand.: 2.227")+
+  theme_minimal()+
+  labs(title = "Prefeitas eleitas", subtitle = "Porcentagem do total de candidatas",
+       x = "", y = "")
+```
+
+# Vereadoras eleitas
+```{r}
+ver_eleitas <- all_elections %>%
+  filter(ano_eleicao == 2012 | ano_eleicao == 2016) %>% 
+  filter(ds_cargo == "VEREADOR", ds_genero == "FEMININO") %>% 
+  count(ano_eleicao, ds_cargo, ds_genero, situacao = ds_situacao_candidato_pleito) %>% 
+  mutate(situacao.2 = 
+           case_when(
+           str_detect(situacao, "MÉDIA") ~ "Eleita",
+            str_detect(situacao, "QP") ~ "Eleita",
+          TRUE ~ "Não eleitas")) %>% 
+  count(ano_eleicao, situacao.2, wt = n) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc = paste0(round(prop.table(n)*100, 2), "%"),
+         total = sum(n),
+         label_total = number(sum(n), big.mark = "."),
+         ano_eleicao = as.factor(ano_eleicao)) %>% 
+  ungroup()
+
+total.16 <- ver_eleitas$total[4]
+total.12 <- ver_eleitas$total[1]
+
+position.12 <- ver_eleitas$total[1]
+position.16 <- ver_eleitas$total[4]
+
+p.3 <- ver_eleitas %>% 
+  ggplot(aes(x = ano_eleicao,  y= n, fill = situacao.2)) +
+  geom_col()+
+  scale_y_continuous(labels = scales::number_format())+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc),
+            position = position_stack(vjust = 0.5),
+            col="white", size = 4)+
+  annotate(geom = "text", x = 1, y = position.12+15000, label = paste0("Total de cand.:", total.12))+
+  annotate(geom = "text", x = 2, y = position.16+15000, label = paste0("Total de cand.:", total.16))+
+  theme_minimal()+
+  labs(title = "Vereadoras eleitas", subtitle = "Porcentagem do total de candidatas",
+       x = "", y = "")
+```
+
+
+# Homens vs. mulheres - vereadoras
+```{r}
+elas.eles.ver <- all_elections %>%
+  filter(ano_eleicao == 2012 | ano_eleicao == 2016) %>% 
+  filter(ds_cargo == "VEREADOR") %>% 
+  count(ano_eleicao, ds_cargo, ds_genero, situacao = ds_situacao_candidato_pleito) %>% 
+  mutate(situacao.2 = 
+           case_when(
+           str_detect(situacao, "MÉDIA") ~ "Eleita",
+            str_detect(situacao, "QP") ~ "Eleita",
+          TRUE ~ "Não eleitas")) %>% 
+  count(ano_eleicao, ds_genero, situacao.2, wt = n) %>% 
+  filter(situacao.2 == "Eleita",
+         str_detect(ds_genero, "NÃO", negate = T)) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc_label = paste0(round(prop.table(n)*100, 1), "%"),
+         perc = prop.table(n)*100,
+         total = sum(n),
+         label_total = number(sum(n), big.mark = "."),
+         ano_eleicao = as.factor(ano_eleicao)) %>% 
+  ungroup()
+
+p.1 <- elas.eles.ver %>%
+  filter(ano_eleicao == 2012) %>% 
+  mutate(lab.ypos = cumsum(perc) - perc/2) %>% 
+  ggplot(aes(x = 3, y = n , fill = ds_genero)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = -1)+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc_label), 
+            position = position_stack(vjust = 0.5),
+            color = "white")+
+  geom_text(x = 1.5,
+            y = 2,
+            label = "2012",
+            size = 5)+
+  xlim(1.5, 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = "top",
+        plot.title = element_text(hjust = .5))+
+  labs( 
+       x = "", y = "")
+
+p.2 <- elas.eles.ver %>%
+  filter(ano_eleicao == 2016) %>% 
+  mutate(lab.ypos = cumsum(perc) - perc/2) %>% 
+  ggplot(aes(x = 3, y = n , fill = ds_genero)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = -1)+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc_label), 
+            position = position_stack(vjust = 0.5),
+            color = "white")+
+  geom_text(x = 1.5,
+            y = 2,
+            label = "2016",
+            size = 5)+
+  xlim(1.5, 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = "none",
+        plot.title = element_text(hjust = .5))+
+  labs( 
+       x = "", y = "")
+```
+
+```{r}
+grid.1 <- p.1 + p.2
+
+
+plot.save <- grid.1 / p.5 / p.4 / p.3+
+  plot_layout(heights = c(2,1,1,1))+
+  plot_annotation(title = "Porporção de mulheres eleitas nas Câmaras por gênero",
+                  subtitle = "Considerando todas as vagas de todos os município")
+```
+
+
+```{r}
+Cairo::CairoPDF("plot_save.pdf", width = 10, height = 15)
+print(plot.save)     
+dev.off()
+
+pdftools::pdf_convert("plot_save.pdf", format = "png")
+
+```
+

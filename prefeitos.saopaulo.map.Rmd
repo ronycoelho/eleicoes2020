@@ -1,0 +1,97 @@
+---
+title: "prefeitos.sp.mapa"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+cores <- c("03045e","023e8a","0077b6","0096c7","00b4d8","48cae4","90e0ef","ade8f4","caf0f8")
+
+cores <- paste0("#", cores)
+
+cores <- c(cores[1:5], "darkgray")
+
+bar_cores <- c(cores[1:5], rep("darkgray", 21))[26:1]
+```
+
+
+```{r}
+df <- all_elections %>%  
+  filter(ano_eleicao == 2016,
+         sg_uf == "SP",
+         ds_cargo == "PREFEITO")
+
+bar.plot <- df %>% 
+  count(sg_ue, sg_partido, situacao = ds_situacao_candidato_pleito) %>%
+  filter(situacao == "ELEITO") %>%
+  group_by(sg_partido) %>% 
+  mutate(qt = sum(n)) %>% 
+  ungroup() %>% 
+  mutate(sg_partido = fct_reorder(sg_partido, qt) )
+
+plot.1 <- bar.plot %>%
+  count(sg_partido, sort = T ) %>%
+  mutate(perc = round(n/sum(n)*100,1),
+         label = paste0(n, " (", perc, "%)")) %>% 
+  ggplot(aes(x = n, y = sg_partido)) +
+  geom_col(aes(fill = sg_partido), show.legend = F)+
+  geom_text(aes(label = label), nudge_x = 10, 
+            hjust = 0, vjust = .5, size = 3 )+
+  scale_fill_manual(values = bar_cores)+
+  theme_minimal()+
+  coord_cartesian(clip = "off")+
+  theme(aspect.ratio = 3/1,
+        plot.margin = unit(c(0,-1,0,0), "cm"),
+        plot.title.position = "plot",
+        panel.grid.major.y  = element_blank())+
+  labs(x = "", y = "")
+```
+
+```{r}
+shape.sp <- shapemun %>% 
+  filter(abbrev_state == "SP")
+
+bar.plot.2 <- bar.plot %>%
+  mutate(sg_partido = fct_lump(sg_partido, 5, other_level = "Outros"),
+         sg_partido = fct_reorder(sg_partido, qt, .desc = T)) 
+
+shape.sp <- shape.sp %>% 
+  left_join(codigos, by = c("code_muni" = "id_municipio")) %>% 
+  left_join(bar.plot.2, by = "sg_ue")
+```
+
+```{r}
+map <- ggplot(drop_na(shape.sp)) +
+  geom_sf(aes(fill= sg_partido))+
+  scale_fill_manual("", values = cores)+
+  coord_sf()+
+  theme_void()+
+  theme(plot.margin = unit(c(0,0,0,-1), "cm"),
+    legend.position = "none")
+```
+
+```{r}
+layout <- c(
+  area(t = 1, l = 1, b = 1, r = 3),
+  area(t = 1, l = 1, b = 1, r = 7)
+)
+
+plot.1 + map+
+  plot_layout(design = layout)+
+  plot_annotation(theme = theme(plot.title.position = "panel",
+                                plot.title = element_text(hjust = .5),
+                                plot.subtitle = element_text(hjust = .5),
+                                plot.caption = element_text(hjust = .8)),
+                  title = "Partidos eleitos nas prefeituras do estado de São Paulo em 2016",
+                  subtitle = "Destacados os 5 principais partidos que somam 66% dos municípios ",
+                  caption = "Fonte: TSE | Gráfico: Rony Coelho"
+                  )
+```
+
+

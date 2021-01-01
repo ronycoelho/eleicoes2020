@@ -1,0 +1,380 @@
+---
+title: "Filiação partidária na capital paulista"
+output: 
+  html_document: 
+    theme: darkly
+    highlight: NULL
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, dpi=200, out.width = "100%", message=F, warning=F,
+                      cache = T, include=F, eval=T)
+```
+
+```{r Packages}
+library(tidyverse)
+library(electionsBR)
+library(rvest)
+library(lubridate)
+library(ggdark)
+
+options(scipen=999)
+
+theme_manual <- function(){
+  theme_grey()+
+  theme(axis.title=element_text(hjust = c(.95),
+                                color = "#fffa8c", size = 18, face="bold"),
+        axis.text= element_text( color = "white", size = 18, face="bold"),
+        title= element_text(color = "white", size = 20),
+        plot.title=element_text(color = "white", size = 30, face="bold", vjust= .9),
+        plot.background=element_rect(fill = "#1e1e1e"),
+        plot.margin=unit(c(1,.5,.5,.5), "cm"),
+        panel.background= element_rect(fill = "#1e1e1e"),
+        panel.grid=element_line(color = "#333333"),
+        panel.grid.minor=element_blank())
+}
+```
+
+
+```{r Adapt function from electionsBr package, eval=F}
+#electionsBR::voter_affiliation()
+get_filiation <- function (party, uf, ascii = FALSE, encoding = "windows-1252", 
+    export = FALSE) 
+  {
+    if (!is.logical(ascii)) 
+      stop("'ascii' must be TRUE or FALSE.")
+  #  test_encoding(encoding)
+    party <- tolower(party)
+    party <- gsub(" ", "_", party)
+    uf <- tolower(uf)
+    dados <- tempfile()
+    local <- tempdir()
+    links <- rep(party, each = length(uf)) %>% sprintf("http://agencia.tse.jus.br/estatistica/sead/eleitorado/filiados/uf/filiados_%s_%s.zip",
+      ., uf)
+    sapply(links, function(x) {
+      download.file(x, dados, method = "curl")
+      unzip(dados, exdir = local)
+    })
+    message("Processing the data...")
+    orig <- getwd()
+    setwd(local)
+    banco <- Sys.glob("*.csv") %>% lapply(function(x) tryCatch(read.csv2(x, 
+      stringsAsFactors = F, fileEncoding = encoding), error = function(e) NULL)) %>% 
+      do.call("rbind", .)
+    names(banco) <- gsub("\\.", "_", names(banco))
+    unlink(local, recursive = T)
+    setwd(orig)
+    if (ascii) 
+      banco <- to_ascii(banco, encoding)
+    if (export) 
+      export_data(banco)
+    message("Done.\n")
+    banco
+  }
+
+all_filiations <- function(lista.siglas){
+    # lista.siglas - vetor com lista de partidos
+    dt <- tibble()
+    
+    for(i in 1:length(lista.siglas)){
+    print(paste(i, ":", lista.siglas[i]))
+    dt.1 <- get_filiation(party=lista.siglas[i], uf = "sp")
+    dt <- bind_rows(dt, dt.1)
+  }
+  
+      return(dt)
+  }
+```
+
+
+```{r Get party list updated, eval=F}
+partidos <- "http://www.tse.jus.br/partidos/partidos-politicos/registrados-no-tse"
+  
+  partidos <- partidos %>%
+  read_html() %>%
+  html_table() %>%
+  .[[1]]
+    
+  siglas <- partidos %>% 
+    slice(1:33) %>%
+    janitor::clean_names() %>% 
+    mutate(sigla = tolower(sigla)) %>% 
+    pull(sigla)
+  
+partidos <- partidos %>% 
+  janitor::clean_names()
+
+partidos <- partidos %>%
+  slice(1:33) %>% 
+  mutate(ano_def = year(dmy(deferimento))) 
+```
+
+
+```{r Get filiations from all parties of Sao Paulo state, eval = F}
+filiacao_estado <- all_filiations(siglas)
+# - Demorou aproximadamente 20 minutos. Foi baixado uma base com 4.943.165 linhas
+# e 19 variaveis 
+```
+
+```{r eval = F}
+filiacao_capital <- filiacao_estado %>%
+  janitor::clean_names() %>% 
+  filter(nome_do_municipio == "SÃO PAULO") %>% 
+  select(-c(1,2,3))
+```
+
+```{r Save file, eval = F}
+setwd("D:\\filiacao")
+
+write.csv(filiacao_estado, "filiacao_estado.csv")
+write.csv(filiacao_capital, "filiacao_capital.csv")
+```
+
+```{r eval = T}
+#save.image("dados_filiacao.RData")
+
+load("D:/filiacao/dados_filiacao.RData")
+```
+
+```{r include=FALSE}
+partidos$sigla[6] <- unique(filiacao_capital$sigla_do_partido)[6]
+
+filiacao_capital <- filiacao_capital %>% 
+  left_join(partidos, by = c("sigla_do_partido" = "sigla"))
+
+filiacao_capital <- filiacao_capital %>%
+  mutate(data_da_filiacao = lubridate::dmy(data_da_filiacao),
+         ano_filiacao = as.numeric(lubridate::year(data_da_filiacao)),
+         ano_filiacao = if_else(ano_filiacao > 2020, 2020, ano_filiacao),
+          ano_filiacao = if_else(ano_filiacao < ano_def, ano_def, ano_filiacao))
+```
+
+Recentemente, o Tribunal Superior Eleitoral [(TSE)](http://www.tse.jus.br/) divulgou que atualmente, no Brasil, existem mais de 16 milhões de filiados a partidos políticos. Detalha em [reportagem veiculada](http://www.tse.jus.br/imprensa/noticias-tse/2020/Julho/brasil-tem-16-4-milhoes-de-filiados-a-partidos-politicos):
+
+> "o Brasil tem hoje 16.499.493 pessoas filiadas a partidos políticos no país (...). Das 33 legendas registradas no TSE, o Movimento Democrático Brasileiro (MDB) é o que tem mais filiados: 2.163.450 pessoas"
+
+São Paulo, segundo os dados apresentados, é o estado com maior número de eleitores filiados, com 3.092.214. Também a capital paulista, [o maior colégio eleitoral municipal do país](https://tse.jusbrasil.com.br/noticias/68479/tre-sp-maior-e-o-menor-eleitorado-estao-em-sao-paulo), com mais de 8 milhões de eleitores, ocupa o primeiro lugar em número de filiações regulares, com 525 mil agremiados. Ou seja, 17% dos filiados estão concentrados na capital do estado, que conta com mais 600 municípios.
+
+Mas, como essas pessoas vinculadas formalmente estão distribuídas entre as legendsa na capital paulista, qual o histórico de filiação e como as organizações políticas têm atraído ou não simpatizantes nos anos mais recentes?
+
+Os dados dessa postagem foram  [extraídos do TSE](https://filia-consulta.tse.jus.br/#/principal/menu), com o auxílio do "pacote electionsBR"[^1], e os gráficos construídos  no [programa R](https://cran.r-project.org/), cujos códigos estão disponíveis para reprodução em meu [github](https://github.com/ronycoelho)[^2]. Fique à vontade para sugestões ou comunicar erros.
+
+Em primeiro lugar, vale notar que, assim como no conjunto do país, no estado de São Paulo é o (P)MDB que conta o maior naco de eleitores filiados, com mais de 400 mil, representando 14,5% do total. Em segundo lugar vem o PT (11,6%), seguido do PTB (9,8%), PSDB (9,7%) e PP (6,2%). Esse "top 5" soma mais de 50% das filiações, sendo o restante distribuído entre as demais 28 agremiações.
+
+>
+
+```{r Filiacao estado, eval = T, include=T, fig.align="center", fig.width=15, fig.height=12}
+filiacao_estado <- filiacao_estado %>%
+  janitor::clean_names()
+
+filiacao_estado %>%
+  filter(situacao_do_registro == "REGULAR") %>% 
+  count(sigla_do_partido, sort= T) %>% 
+  mutate(total = sum(n),
+         perc = round((n/total)*100,1)) %>%
+  mutate(label.1 = ifelse(perc > 1, perc, NA),
+         label.2 = ifelse(perc < 1, perc, NA)) %>% 
+  mutate(sigla_do_partido = fct_reorder(sigla_do_partido, n)) %>% 
+  ggplot(aes(y = sigla_do_partido, x = n))+
+  geom_col(fill = "#00bfff", color = "gray", 
+           show.legend=F)+
+  scale_x_continuous(labels=scales::comma_format(big.mark="."))+
+  geom_label(aes(y = sigla_do_partido, x = n, 
+                 label = ifelse(label.1 > 1, paste0(label.1, "%"), NA)),
+             hjust = 0, 
+             vjust = 0.5, 
+             colour = "#fffa8c",
+             face = "bold",
+             fill = NA, 
+             label.size = NA, 
+             size = 5)+
+  geom_label(aes(y = sigla_do_partido, x = n, 
+                 label = ifelse(label.2 < 1, paste0(label.2, "%"), NA)),
+             hjust = 0, 
+             vjust = 0.5, 
+             colour = "#fffa8c",
+             face = "bold",
+             fill = NA, 
+             label.size = NA, 
+             size = 5)+ 
+  theme_manual()+
+  labs(title = "Filiados no Estado",
+       subtitle = "Quantidade e porcentagem de filiados regulares em 2020",
+       caption = "Fonte: TSE \nGráfico: twitter.com/_ronycoelho")+
+  xlab("quatidade de filiados") + ylab("partidos")
+```
+
+>
+
+No entanto, na capital paulista, as primeiras posições se invertem, sendo o PT a ocupar o primeiro lugar e o segundo, o (P)MDB. Em São Paulo, o PT tem pouco mais de 117 mil eleitores filiados, representando aproximadamente 22% do total. As posições subsequente ficam bem abaixo dessa marca: (P)MDB, com 75 mil (14,3%); PTB (13%), com 68 mil e PSDB, com 34 mil (6,6%). Os 10 partidos com mais filiados, somados, totalizaram mais de 80% dos agremiados. Na ponta inferior, como se pode ver no gráfico, 20 legendas (do Psol, com 1,9%, para baixo) não chegam à marca de 2% de simpatizantes vinculados.
+
+>
+
+```{r Filiacao capital, eval = T, include=T, fig.align="center", fig.width=15, fig.height=12}
+
+filiacao_capital %>% 
+  filter(situacao_do_registro == "REGULAR") %>% 
+  count(sigla_do_partido, sort= T) %>% 
+  mutate(total = sum(n),
+         perc = round((n/total)*100,1)) %>% 
+  mutate(label.1 = ifelse(perc > 1, perc, NA),
+         label.2 = ifelse(perc < 1, perc, NA)) %>% 
+  mutate(sigla_do_partido = fct_reorder(sigla_do_partido, n)) %>% 
+  ggplot(aes(y = sigla_do_partido, x = n))+
+  geom_col(fill = "#00bfff", color = "gray", 
+           show.legend=F) +
+  scale_x_continuous(labels=scales::comma_format(big.mark="."), limits=(c(0,125000)))+
+  geom_label(aes(y = sigla_do_partido, x = n, 
+                 label = ifelse(label.1 > 1, paste0(label.1, "%"), NA)),
+             hjust = 0, 
+             vjust = 0.5, 
+             colour = "#fffa8c",
+             face = "bold",
+             fill = NA, 
+             label.size = NA, 
+             size = 5)+
+  geom_label(aes(y = sigla_do_partido, x = n, 
+                 label = ifelse(label.2 < 1, paste0(label.2, "%"), NA)),
+             hjust = 0, 
+             vjust = 0.5, 
+             colour = "#fffa8c",
+             face = "bold",
+             fill = NA, 
+             label.size = NA, 
+             size = 5)+
+  theme_manual()+
+  labs(title = "Filiados na capital paulista",
+       subtitle = "Quantidade e porcentagem de filiados regulares em 2020",
+       caption = "Fonte: TSE \nGráfico: twitter.com/_ronycoelho")+
+  xlab("quatidade de filiados") + ylab("partidos")
+```
+
+>
+
+Como seria de se espearar, os partidos que ocupam as primeiras posições são também os mais antigos, segundo o registro [formalizado no TSE](http://www.tse.jus.br/partidos/partidos-politicos/registrados-no-tse), representado abaixo pela linha vermelha. O histórico de filiação de cada legenda, na capital paulista, pode ser visualizado neste gráfico. Nota-se, em quase todos os casos, picos coincidentes com anos eleitorais. No caso do PT, um grande número de simpatizantes se filiou em 2004, quando da disputa de Marta Suplicy para reeleição. Nos anos mais recentes, é possível perceber o aumento da filiação no PSL, partido pelo qual Bolsonaro (hoje sem partido) disputou as eleições, em 2018. 
+
+>
+
+```{r Historico filiacao, eval = T, include=T, fig.align="center", fig.width=15, fig.height=20}
+
+ano_eleicao <- seq(1980, 2020, by = 4)
+
+filiacao_capital %>%
+  filter(situacao_do_registro == "REGULAR") %>% 
+  add_count(sigla_do_partido, ano_filiacao, name="qt_party_year") %>%
+  add_count(sigla_do_partido, name="total_party") %>% 
+  mutate(sigla_do_partido = fct_lump(sigla_do_partido, 29),
+         sigla_do_partido = fct_reorder(sigla_do_partido, total_party, .desc=T)) %>%
+  ggplot()+
+  geom_line(aes(x = ano_filiacao, y = qt_party_year), color = "#00bfff")+
+  scale_x_continuous(breaks = ano_eleicao, 
+                     minor_breaks=ano_eleicao,
+                     position="top")+
+  scale_y_continuous(label = scales::comma_format(big.mark="."),
+                       position=c("right"), breaks=seq(0,25000,5000))+
+  geom_vline(aes(xintercept = ano_def), color = "red", show.legend=T)+
+  facet_wrap(vars(sigla_do_partido), ncol=3, 
+             strip.position = "left") +
+  theme_manual()+
+  theme(axis.text.x= element_text(angle = 90, size = 12),
+        axis.text.y= element_text(size=12),
+        strip.text = element_text(color = "white", 
+                                  hjust= 0, 
+                                  size = 15, 
+                                  face="bold"),
+        strip.background = element_blank())+
+  labs(title = "Historico da filiação",
+       subtitle = "De 1980 a 2020, com indicacao do ano de registro do partido",
+       caption = "Fonte: TSE \nGrafico: twitter.com/_ronycoelho")+
+  xlab("ano") + ylab("quantidade")
+```
+
+>
+
+Tomando apenas os últimos 5 anos, em número totais, o PSL foi o partido que mais recebeu simpatizantes. Em números aproximados, agregou mais de 10 mil pessoas, mas, desse total, 6.700 foram no eleitoral de 2018. Antes, os números de novas filiações eram pífios, em 2017 filiou apenas 213 pessoas, e, depois, reduziram drásticamente. Em 2019, filiou menos da metade (2400) do que em 2018. Movimento inverso seguiu o PT, terceiro lugar em números de filiados no período, atrás do PSDB (com 8.700), que em 2018 recebeu menos filiados (1.800) e mais em 2019 (3.700), totalizando 8.400 no período.
+
+>
+
+```{r Filiacao recente, eval = T, include=T, fig.align="center", fig.width=15, fig.height=20}
+anos_recentes <- seq(2015, 2020)
+
+filiacao_capital %>%
+  filter(situacao_do_registro == "REGULAR",
+         ano_filiacao > 2014) %>% 
+  add_count(sigla_do_partido, ano_filiacao, name="qt_party_year") %>%
+  add_count(sigla_do_partido, name="total_party") %>%
+  mutate(sigla_do_partido = fct_lump(sigla_do_partido, 20),
+         sigla_do_partido = fct_reorder(sigla_do_partido, total_party, .desc=T))%>%
+  ggplot()+
+  geom_line(aes(x = ano_filiacao, y = qt_party_year), color = "#00bfff")+
+  scale_x_continuous(breaks = anos_recentes, 
+                     minor_breaks=anos_recentes,
+                     position=c("top"))+
+  scale_y_continuous(label = scales::comma_format(big.mark="."),
+                     position=c("right"), breaks=seq(0,6000,1000))+
+  facet_wrap(vars(sigla_do_partido), ncol=3, 
+             strip.position = "left")+
+  theme_manual()+
+  theme(axis.text.x= element_text(angle = 90, size = 12),
+        axis.text.y= element_text(size=12),
+        strip.text = element_text(color = "white",
+                                  size = 15,
+                                  hjust=0,
+                                  face="bold"
+                                  ),
+        strip.background=element_blank())+
+  labs(title = "Filiação recente",
+       subtitle = "A partir de 2015",
+       caption = "Fonte: TSE \nGráfico: twitter.com/_ronycoelho")+
+  xlab("ano") + ylab("quantidade")
+```
+
+>
+
+Em relação às desfiliações, ocupa o primeiro lugar o partido Novo (o chamado PSL Personallitè). Cerca de 1.800 pessoas deixaram o partido desde que foi fundado (2015). O PSL, ex de Bolsonaro, além de ter queda no número de filiações em 2019, teve aumento das desfiliações, provavelmente seguindo os movimentos dos milicianos. Em terceiro lugar aparece o PSOL (54), seguido do PSDB (47), mas com número de desfiliações irrosório, assim como os demais partidos. Ao fim e ao cabo, o único com número de desfiliações significativa foi o Partido Novo.
+
+>
+
+```{r Desfilicao recente, eval = T, include=T, fig.align="center", fig.width=15, fig.height=20}
+filiacao_capital %>%
+  filter(situacao_do_registro == "DESFILIADO",
+         ano_filiacao > 2014) %>% 
+  add_count(sigla_do_partido, ano_filiacao, name="qt_party_year") %>%
+  add_count(sigla_do_partido, name="total_party") %>%
+  mutate(sigla_do_partido = fct_lump(sigla_do_partido, 14),
+         sigla_do_partido = fct_reorder(sigla_do_partido, total_party, .desc=T))%>%
+  ggplot()+
+  geom_line(aes(x = ano_filiacao, y = qt_party_year), color = "#00bfff")+
+  scale_x_continuous(breaks = anos_recentes, 
+                     minor_breaks=anos_recentes,
+                     position=c("top"))+
+  scale_y_continuous(position=c("right"), breaks=seq(0,600, 100))+
+  facet_wrap(vars(sigla_do_partido), 
+             ncol=3,  
+             strip.position = "left") +
+  theme_manual()+
+  theme(axis.text.x= element_text(angle = 90, size = 12),
+        axis.text.y= element_text(size=12),
+        strip.text = element_text(color = "white",
+                                  hjust=0,
+                                  face="bold",
+                                  size = 15),
+        strip.background=element_blank())+
+  labs(title = "Desfiliação recente",
+       subtitle = "A partir de 2015",
+       caption = "Fonte: TSE \nGráfico: twitter.com/_ronycoelho")+
+  xlab("ano") + ylab("quantidade")
+```
+
+[^1]: Meireles, Fernando; Silva, Denisson; Costa, Beatriz. (2016). electionsBR: R functions todownload and clean Brazilian electoral data. URL: http://electionsbr.com/  
+
+
+[^2]: Encontrou erro? Sugestões? Fique à vontade para entrar em contato pelo  [github](https://github.com/ronycoelho)  ou  [twitter](https://twitter.com/_ronycoelho)

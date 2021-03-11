@@ -1,0 +1,65 @@
+---
+title: "prefeitos_por_partidos"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(stringi)
+#library(ribge)
+library(scales)
+library(ggthemes)
+library(sf)
+library(patchwork)
+
+setwd("C:/rstats/eleicoes2020/")
+```
+
+<!-- ```{r} -->
+<!-- save.image("C:/rstats/eleicoes2020/Dados_12_16_e20") -->
+<!-- load("C:/rstats/eleicoes2020/Dados_2012_2016.RData") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- brasil <- brasil %>% -->
+<!--   janitor::clean_names() -->
+
+<!-- dt.2012.2016 <- dt.2012.2016 %>% -->
+<!--   janitor::clean_names() -->
+
+<!-- temp.1 <- dt.2012.2016 %>% #glimpse() -->
+<!--   select(ano_eleicao, sg_uf = sigla_uf, sg_ue = sigla_ue, nm_ue = descricao_ue, -->
+<!--          ds_cargo = descricao_cargo, nm_candidato = nome_candidato,  -->
+<!--          sq_candidato = sequencial_candidato, nr_candidato = numero_candidato, -->
+<!--          nr_cpf_candidato = cpf_candidato, nr_titulo_eleitoral_candidato = num_titulo_eleitoral_candidato,  -->
+<!--          nm_urna_candidato = nome_urna_candidato, -->
+<!--          sg_partido = sigla_partido, ds_ocupacao = descricao_ocupacao,  -->
+<!--          dt_nascimento = data_nascimento,  ds_genero = descricao_sexo, -->
+<!--          ds_grau_instrucao = descricao_grau_instrucao, -->
+<!--          ds_estado_civil = descricao_estado_civil, nm_email = email_candidato, -->
+<!--          ds_situacao_candidato_pleito = desc_sit_tot_turno ) -->
+
+<!-- all_elections <- brasil %>%  -->
+<!--   mutate(ano_eleicao = 2020) %>%  -->
+<!--   select(one_of(names(temp.1))) %>%  -->
+<!--   bind_rows(temp.1) -->
+
+<!-- all_elections %>%  -->
+<!--   count(ds_cargo, sort = T, ano_eleicao) -->
+<!-- ``` -->
+
+```{r}
+save.image("C:/rstats/eleicoes2020/all_elections_")
+load("C:/rstats/eleicoes2020/Dados_2012_2016.RData")
+```
+
+```{r}
+
+```
+

@@ -1,0 +1,118 @@
+---
+title: "Eleições 2020"
+output: 
+  html_document: 
+    df_print: tibble
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# bibliotecas
+```{r blibliotecas}
+library(tidyverse)
+library(scales)
+library(descr)
+library(ggsci)
+library(ggthemes)
+library(mdthemes)
+library(kableExtra)
+library(patchwork)
+library(geobr)
+library(janitor)
+library(electionsBR)
+
+#setwd("C:/rstats/soudapaz")
+```
+
+# funcoes
+```{r}
+
+download.zip <- function(link){
+  wd <- getwd()
+  temp_dir <- tempdir()
+  setwd(temp_dir)
+  temp_file <- tempfile(tmpdir=temp_dir)
+  download.file(url=link, destfile=temp_file)
+  unzip(temp_file, exdir=temp_dir)
+  files <- list.files(path=temp_dir)
+  unlink(temp_file)
+  
+  return(files) 
+  setwd(wd)
+}
+```
+
+# carregamento da base
+```{r}
+link_candidatos <- "http://agencia.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2020.zip"
+
+list.of.files <- download.zip(link_candidatos)
+
+file <- paste0(tempdir(), "\\consulta_cand_2020_BRASIL.csv")
+# guess_encoding(cand_sp)
+
+brasil.eleitos <- read_csv2(file, locale(encoding = "ISO-8859-1"), col_names = T, col_types = NULL) %>% 
+  clean_names()
+
+load("C:/rstats/soudapaz/Dados_2012_2016.RData")
+```
+
+
+```{r}
+dt.2012.2016 <- dt.2012.2016 %>% 
+  clean_names()
+```
+
+```{r}
+glimpse(dt.2012.2016)
+
+temp.1 <- dt.2012.2016 %>%
+  select(ano_eleicao, sg_uf = sigla_uf, sg_ue = sigla_ue, nm_ue = descricao_ue,
+         ds_cargo = descricao_cargo, nm_candidato = nome_candidato, 
+         sq_candidato = sequencial_candidato, nr_candidato = numero_candidato,
+         nr_cpf_candidato = cpf_candidato, nr_titulo_eleitoral_candidato = num_titulo_eleitoral_candidato, 
+         nm_urna_candidato = nome_urna_candidato,
+         sg_partido = sigla_partido, ds_ocupacao = descricao_ocupacao, 
+         dt_nascimento = data_nascimento,  ds_genero = descricao_sexo,
+         ds_grau_instrucao = descricao_grau_instrucao,
+         ds_estado_civil = descricao_estado_civil, nm_email = email_candidato,
+         ds_sit_tot_turno = desc_sit_tot_turno)
+
+# names(local.cand.2012)
+# names(dt.2012.2016)
+# names(brasil.eleitos)
+# 
+# local.cand.2012 %>% 
+#   count(DESC_SIT_TOT_TURNO)
+# 
+# dt.2012.2016 %>% 
+#   count(desc_sit_tot_turno)
+# 
+# 
+# brasil.eleitos %>% 
+#   count(ds_sit_tot_turno)
+# 
+all_elections <- brasil.eleitos %>% 
+  mutate(ano_eleicao = 2020) %>% 
+  select(one_of(names(temp.1))) %>% 
+  bind_rows(temp.1)
+
+all_elections %>% 
+  count(ano_eleicao)
+```
+
+```{r}
+all_elections %>% 
+  count(ano_eleicao, ds_cargo, ds_sit_tot_turno)
+```
+
+```{r}
+
+
+
+```
+

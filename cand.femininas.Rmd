@@ -87,6 +87,8 @@ p.4 <- all_elections %>%
   annotate(geom = "text", x = 1, y = 2400, label = "Total de cand.: 2.166")+
   annotate(geom = "text", x = 2, y = 2500, label = "Total de cand.: 2.227")+
   theme_minimal()+
+  theme(legend.direction = "horizontal",
+        legend.position = "bottom")+
   labs(title = "Prefeitas eleitas", subtitle = "Porcentagem do total de candidatas",
        x = "", y = "")
 ```
@@ -127,6 +129,8 @@ p.3 <- ver_eleitas %>%
   annotate(geom = "text", x = 1, y = position.12+15000, label = paste0("Total de cand.:", total.12))+
   annotate(geom = "text", x = 2, y = position.16+15000, label = paste0("Total de cand.:", total.16))+
   theme_minimal()+
+  theme(legend.direction = "horizontal",
+        legend.position = "bottom")+
   labs(title = "Vereadoras eleitas", subtitle = "Porcentagem do total de candidatas",
        x = "", y = "")
 ```
@@ -163,7 +167,8 @@ p.1 <- elas.eles.ver %>%
   scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
   geom_text(aes(label = perc_label), 
             position = position_stack(vjust = 0.5),
-            color = "white")+
+            color = "white",
+            fontface= "bold")+
   geom_text(x = 1.5,
             y = 2,
             label = "2012",
@@ -171,9 +176,11 @@ p.1 <- elas.eles.ver %>%
   xlim(1.5, 4) +
   theme_void()+
   theme(legend.direction = "horizontal",
-        legend.position = "top",
-        plot.title = element_text(hjust = .5))+
-  labs( 
+        legend.position = "none",
+        plot.title = element_text(hjust = .3),
+        plot.subtitle = element_text(hjust = .3))+
+  labs(title = "Porporção de mulheres eleitas nas Câmaras",
+                  subtitle = "Considerando todas as vagas de todos os municípios", 
        x = "", y = "")
 
 p.2 <- elas.eles.ver %>%
@@ -185,7 +192,8 @@ p.2 <- elas.eles.ver %>%
   scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
   geom_text(aes(label = perc_label), 
             position = position_stack(vjust = 0.5),
-            color = "white")+
+            color = "white",
+            fontface= "bold")+
   geom_text(x = 1.5,
             y = 2,
             label = "2016",
@@ -194,19 +202,92 @@ p.2 <- elas.eles.ver %>%
   theme_void()+
   theme(legend.direction = "horizontal",
         legend.position = "none",
-        plot.title = element_text(hjust = .5))+
+        plot.title = element_text(hjust = .3),
+        plot.subtitle = element_text(hjust = .3))+
+  labs( 
+       x = "", y = "")
+```
+
+# Homens vs. mulheres - prefeituras
+```{r}
+elas.eles.pref <- all_elections %>%
+  filter(ano_eleicao == 2012 | ano_eleicao == 2016) %>% 
+  filter(ds_cargo == "PREFEITO") %>% 
+  count(ano_eleicao, ds_cargo, ds_genero, situacao = ds_situacao_candidato_pleito) %>%
+  filter(str_detect(situacao, "TURNO", negate = T)) %>% 
+  mutate(situacao.2 = 
+           ifelse(situacao == "ELEITO", "Eleitas", "Não eleitas")) %>%
+  count(ano_eleicao, ds_genero, situacao.2, wt = n) %>% 
+  filter(situacao.2 == "Eleitas",
+         str_detect(ds_genero, "NÃO", negate = T)) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc_label = paste0(round(prop.table(n)*100, 1), "%"),
+         perc = prop.table(n)*100,
+         total = sum(n),
+         label_total = number(sum(n), big.mark = "."),
+         ano_eleicao = as.factor(ano_eleicao)) %>% 
+  ungroup()
+
+v.1 <- elas.eles.pref %>%
+  filter(ano_eleicao == 2012) %>% 
+  mutate(lab.ypos = cumsum(perc) - perc/2) %>% 
+  ggplot(aes(x = 3, y = n , fill = ds_genero)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = -1)+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc_label), 
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            fontface= "bold")+
+  geom_text(x = 1.5,
+            y = 2,
+            label = "2012",
+            size = 5)+
+  xlim(1.5, 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = c(0.4, 0.9),
+        plot.title = element_text(hjust = .3))+
+  labs(title = "Porporção de mulheres eleitas nas Prefeituras",
+       x = "", y = "")
+
+v.2 <- elas.eles.pref %>%
+  filter(ano_eleicao == 2016) %>% 
+  mutate(lab.ypos = cumsum(perc) - perc/2) %>% 
+  ggplot(aes(x = 3, y = n , fill = ds_genero)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = -1)+
+  scale_fill_manual("", values = c(scale_color[7], scale_color[8]))+
+  geom_text(aes(label = perc_label), 
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            fontface= "bold")+
+  geom_text(x = 1.5,
+            y = 2,
+            label = "2016",
+            size = 5)+
+  xlim(1.5, 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = "none",
+        plot.title = element_text(hjust = .3))+
   labs( 
        x = "", y = "")
 ```
 
 ```{r}
-grid.1 <- p.1 + p.2
 
+grid.1 <- v.1 +v.2
+grid.2 <- p.1 + p.2
 
-plot.save <- grid.1 / p.5 / p.4 / p.3+
-  plot_layout(heights = c(2,1,1,1))+
-  plot_annotation(title = "Porporção de mulheres eleitas nas Câmaras por gênero",
-                  subtitle = "Considerando todas as vagas de todos os município")
+grids <- grid.1 / grid.2
+
+plot.save <- grids / p.5 / (p.4 + p.3 )+
+  plot_layout(heights = c(2,2,1,1))+
+  plot_annotation(title = "Mulheres nas eleições municipais",
+                  subtitle = "2012, 2016 e 2020",
+                  caption = "Fonte: TSE | Gráficos: Rony Coelho"
+                  )
 ```
 
 
@@ -216,6 +297,5 @@ print(plot.save)
 dev.off()
 
 pdftools::pdf_convert("plot_save.pdf", format = "png")
-
 ```
 

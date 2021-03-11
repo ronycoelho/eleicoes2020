@@ -1,0 +1,122 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+```
+
+```{r}
+data <- tibble(ano = c(2020,2016 ), Total = c(557.409, 496.927), 
+               Aptos = c(535.952,469.011), Inaptos = c(21.453, 27.917))
+
+```
+
+
+```{r}
+data.long <- data %>%
+  pivot_longer(-ano) %>% 
+  group_by(name) %>% 
+  arrange(ano, .by_group = T) %>% 
+  mutate(perc_var = round((value/lag(value) - 1) * 100,0), 
+         perc_var2 = ifelse(is.na(perc_var), value, paste0(value, "\n(", perc_var, "%)")),
+         color = ifelse(perc_var < 0, "red", "blue"),
+         color = ifelse(is.na(perc_var), "blue", color)) %>% 
+  ungroup() 
+
+cores <- data.long$color
+
+plot.1 <- data.long %>%  
+  ggplot(aes(x=name, y = value, fill = as.factor(ano)))+
+  geom_col(position = "dodge")+
+  geom_text(aes(label = perc_var2), 
+            position = position_dodge(width =  1),
+            color = cores,
+            vjust = -.5)+
+  coord_cartesian(clip = "off")+
+  scale_fill_brewer("", type = "div", palette = 9)+
+  theme_minimal()+
+  theme(legend.position = "top",
+        legend.direction = "horizontal")+
+  labs(title = "Candidaturas Aptas e Inaptas nas eleições de 2016 e 2020",
+       x = "", y = "")
+```
+
+
+```{r}
+aptos.2020 <- data %>% 
+  filter(ano == 2020) %>% 
+  pivot_longer(-ano) %>% 
+  filter(name != "Total") %>% 
+  mutate(perc = prop.table(value)*100,
+         perc_label = paste0(round(perc, 2), "%")) %>% 
+  ggplot(aes(x = 3, y = value , fill = name)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = 1, clip = "off")+
+  xlim(1.5, 3.5) +
+  scale_fill_brewer(palette = "Set1", direction = -1)+
+  geom_label(aes(label = perc_label),
+            x = c(-.3, 3), 
+            hjust = .5,
+            size = 4,
+            show.legend = F,
+            color = "white",
+            fontface= "bold")+
+  geom_text(x = 1.5,
+            y = 3,
+            label = "2020",
+            size = 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = "top",
+plot.margin = unit(c(0,0,0,0), "cm"),
+                plot.title = element_text(hjust = .3),
+        plot.subtitle = element_text(hjust = .3))+
+  labs(fill = "")
+```
+
+```{r}
+aptos.2016 <- data %>% 
+  filter(ano == 2016) %>% 
+  pivot_longer(-ano) %>% 
+  filter(name != "Total") %>% 
+  mutate(perc = prop.table(value)*100,
+         perc_label = paste0(round(perc, 2), "%")) %>% 
+  ggplot(aes(x = 3, y = value , fill = name)) +
+  geom_bar(stat = "identity", color = "white")+
+  coord_polar("y", start=0, direction = 1, clip = "off")+
+  xlim(1.5, 3.5) +
+  scale_fill_brewer(palette = "Set1", direction = -1)+
+  geom_label(aes(label = perc_label),
+            x = c(-.3, 3), 
+            hjust = .5,
+            size = 4,
+            show.legend = F,
+            color = "white",
+            fontface= "bold")+
+  geom_text(x = 1.5,
+            y = 3,
+            label = "2016",
+            size = 4) +
+  theme_void()+
+  theme(legend.direction = "horizontal",
+        legend.position = "none",
+plot.margin = unit(c(0,0,0,0), "cm"),
+                plot.title = element_text(hjust = .3),
+        plot.subtitle = element_text(hjust = .3))+
+  labs(fill = "")
+```
+
+```{r}
+plot.1 +(aptos.2020/aptos.2016)+
+  plot_layout(widths = c(2,1))
+```
+

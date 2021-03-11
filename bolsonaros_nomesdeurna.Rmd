@@ -1,0 +1,82 @@
+---
+title: "prefeitos_por_partidos"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(stringi)
+#library(ribge)
+library(scales)
+library(ggthemes)
+library(sf)
+library(patchwork)
+
+setwd("C:/rstats/eleicoes2020/")
+```
+
+```{r}
+save.image("C:/rstats/eleicoes2020/all_elections_")
+load("C:/rstats/eleicoes2020/all_elections_.RData")
+```
+
+```{r}
+all_elections %>%
+  filter(str_detect(nm_urna_candidato, "BOLSONARO")) %>% 
+  count(ano_eleicao) %>% #nm_urna_candidato 
+  ggplot(aes(x = as.factor(ano_eleicao), y = n))+
+  geom_col()+
+  geom_text(aes(y = n, label = n ), vjust = -1)+
+  coord_cartesian(clip = "off")+
+  theme_minimal()+
+  labs(title = '"Bolsonaros" nas eleições municipais', 
+       subtitle ="Número de vezes que aparecem o sobrenome Bolsonaro nos nomes de urna",
+       x = "", y = "")
+
+# all_elections %>%
+#   filter(str_detect(nm_urna_candidato, "BOLSONARO")) %>% 
+#   count(ano_eleicao, nm_urna_candidato) 
+```
+
+```{r}
+all_elections %>%
+  count(ano_eleicao, ds_genero) %>% 
+  filter(str_detect(ds_genero, "NÃO", negate = T)) %>% 
+  group_by(ano_eleicao) %>% 
+  mutate(perc = n/sum(n)*100) %>% 
+  ungroup () %>%
+  filter(ds_genero == "FEMININO") %>% 
+  ggplot(aes(as.factor(ano_eleicao), n))+
+  geom_col(width = .5, fill = scale_color[10])+
+  geom_point()+
+  geom_line(group = 1)+
+  geom_text(aes(label = label.1), vjust = -1)+
+  geom_text(aes(label = label.2, vjust = -3),
+            color = c("transparent", "red", "blue"))+
+  scale_y_continuous(limits = c(0, 9000), breaks = seq(0, 8000, 2000))+
+    coord_cartesian(clip = "off")+
+  theme(text = element_text(size = 8),
+        title = element_text(size = 10))+
+  labs(title = "Militares")
+  
+
+
+
+
+count <- all_elections %>% 
+  count(ano_eleicao)
+
+count <- count %>% 
+  mutate(perct = c(" ", round(count$n[2]/count$n[1]*100-100, 2), 
+                   round(count$n[3]/count$n[2]*100-100, 2))) %>%
+  mutate(label.1 = number(n, big.mark = "."),
+        label.2 = ifelse(perct < 0, paste0(perct, "%"), paste0("+", perct,  "%")))
+
+```
+
